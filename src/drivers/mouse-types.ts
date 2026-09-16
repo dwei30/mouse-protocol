@@ -67,6 +67,17 @@ export interface MouseUiHints {
     maxDpi: number;
     stepDpi: number;
   };
+  /**
+   * Two-layer (Normal / G-Shift) onboard button editor. Distinct from the
+   * flat `buttonMappings` remapper and from HID++ onboard-profile assignments.
+   */
+  buttonLayerEditor?: {
+    layers: readonly ("primary" | "g-shift")[];
+    names: readonly string[];
+    lockPrimaryCount?: number;
+    actions: readonly string[];
+    keyboard?: boolean;
+  };
   /** Simple DPI indicator modes normalized as 0 off, 1 steady, 2 breathing. */
   dpiLighting?: {
     modes: readonly (0 | 1 | 2)[];
@@ -199,6 +210,13 @@ export interface MouseStatus {
   profileNames?: string[];
   /** Every action `setButtonMapping` will accept, in display order. */
   buttonOptions?: string[];
+  /** Layered onboard button assignments when `ui.buttonLayerEditor` is set. */
+  buttonLayerAssignments?: Array<{
+    layer: "primary" | "g-shift";
+    button: number;
+    action: string;
+    raw: number[];
+  }>;
   /** Button names the device reported in an unknown or macro encoding. */
   fixedButtons?: string[];
   deviceMode?: "Onboard" | "Host" | "Unknown";

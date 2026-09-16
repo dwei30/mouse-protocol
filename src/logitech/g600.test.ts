@@ -22,6 +22,11 @@ import {
   g600ProfileReportId,
   g600WithDpiStage,
   g600WithPollingRate,
+  g600ButtonAssignments,
+  g600DecodeButtonAction,
+  g600EncodeKeyboard,
+  g600EncodeNamedAction,
+  g600WithButton,
 } from "./g600.ts";
 
 /** Wired G600 F4 capture. */
@@ -104,4 +109,20 @@ test("profile patches keep unknown bytes", () => {
   const staged = g600WithDpiStage(profile, 0, 1600);
   assert.equal(staged.dpiStages[0], 1600);
   assert.equal(g600EncodeProfile(staged)[14], 0x20);
+});
+
+test("button triples decode named actions and keyboard shortcuts", () => {
+  const profile = g600DecodeProfile(fromHex(PROFILE1_HEX));
+  assert.equal(g600DecodeButtonAction(profile.buttons[0]!), "Left click");
+  assert.equal(g600DecodeButtonAction(profile.buttons[5]!), "G-Shift");
+  assert.equal(g600DecodeButtonAction(profile.buttons[8]!), "Keyboard shortcut");
+  assert.equal(g600DecodeButtonAction(profile.gshiftButtons[8]!), "Keyboard shortcut");
+  const assignments = g600ButtonAssignments(profile);
+  assert.equal(assignments.length, 40);
+  assert.equal(assignments[5]?.action, "G-Shift");
+  const remapped = g600WithButton(profile, "primary", 6, g600EncodeNamedAction("Next DPI"));
+  assert.equal(g600EncodeProfile(remapped)[31 + 6 * 3], 0x11);
+  assert.equal(g600EncodeProfile(remapped)[31], 0x01);
+  const keyed = g600EncodeKeyboard(0x04, 0x02);
+  assert.deepEqual(keyed, { code: 0, modifier: 0x02, key: 0x04 });
 });

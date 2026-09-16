@@ -5,6 +5,7 @@ export const G600_FEATURE_PAYLOAD_SIZE = G600_PROFILE_SIZE - 1;
 export const G600_ACTIVE_SIZE = 4;
 export const G600_STAGE_COUNT = 4;
 export const G600_BUTTON_COUNT = 20;
+export const G600_LOCK_PRIMARY_COUNT = 2;
 export const G600_DPI_MIN = 200;
 export const G600_DPI_MAX = 8200;
 export const G600_DPI_STEP = 50;
@@ -222,4 +223,85 @@ export function g600ActiveDpi(profile: G600Profile, dpiSlot: number): number {
   const fromSlot = profile.dpiStages[dpiSlot] ?? 0;
   if (fromSlot > 0) return fromSlot;
   return profile.dpiStages.find((stage) => stage > 0) ?? 0;
+}
+
+export type G600ButtonLayer = "primary" | "g-shift";
+
+export const G600_BUTTON_ACTIONS = [
+  "Disabled", "Left click", "Right click", "Middle click", "Back", "Forward",
+  "Next DPI", "Previous DPI", "Cycle DPI", "DPI Shift", "Cycle profiles", "G-Shift",
+] as const;
+
+export type G600NamedAction = (typeof G600_BUTTON_ACTIONS)[number];
+export type G600ButtonAction = G600NamedAction | "Keyboard shortcut" | "Custom";
+
+export const G600_BUTTON_NAMES = [
+  "Left click", "Right click", "Wheel click", "Back", "Forward", "G-Shift",
+  "G7", "G8", "G9", "G10", "G11", "G12", "G13", "G14", "G15",
+  "G16", "G17", "G18", "G19", "G20",
+] as const;
+
+const NAMED_CODE: Record<Exclude<G600NamedAction, "Disabled">, number> = {
+  "Left click": 0x01,
+  "Right click": 0x02,
+  "Middle click": 0x03,
+  Back: 0x04,
+  Forward: 0x05,
+  "Next DPI": 0x11,
+  "Previous DPI": 0x12,
+  "Cycle DPI": 0x13,
+  "DPI Shift": 0x15,
+  "Cycle profiles": 0x14,
+  "G-Shift": 0x17,
+};
+
+export interface G600ButtonAssignment {
+  layer: G600ButtonLayer;
+  button: number;
+  action: G600ButtonAction;
+  raw: number[];
+}
+
+export function g600DecodeButtonAction(button: G600Button): G600ButtonAction {
+  if (button.code === 0 && button.modifier === 0 && button.key === 0) return "Disabled";
+  if (button.code === 0) return "Keyboard shortcut";
+  const named = (Object.entries(NAMED_CODE) as Array<[Exclude<G600NamedAction, "Disabled">, number]>)
+    .find(([, code]) => code === button.code)?.[0];
+  return named ?? "Custom";
+}
+
+export function g600EncodeNamedAction(action: G600NamedAction): G600Button {
+  if (action === "Disabled") return { code: 0, modifier: 0, key: 0 };
+  return { code: NAMED_CODE[action], modifier: 0, key: 0 };
+}
+
+export function g600EncodeKeyboard(key: number, modifiers: number): G600Button {
+  return { code: 0, modifier: modifiers & 0xff, key: key & 0xff };
+}
+
+export function g600WithButton(
+  profile: G600Profile,
+  layer: G600ButtonLayer,
+  index: number,
+  button: G600Button,
+): G600Profile {
+  if (index < 0 || index >= G600_BUTTON_COUNT) {
+    throw new Error(`G600 button index must be 0–${G600_BUTTON_COUNT - 1}.`);
+  }
+  const key = layer === "g-shift" ? "gshiftButtons" : "buttons";
+  const next = profile[key].slice();
+  while (next.length < G600_BUTTON_COUNT) next.push({ code: 0, modifier: 0, key: 0 });
+  next[index] = button;
+  return { ...profile, [key]: next };
+}
+
+export function g600ButtonAssignments(profile: G600Profile): G600ButtonAssignment[] {
+  const layerOf = (layer: G600ButtonLayer, buttons: G600Button[]): G600ButtonAssignment[] =>
+    buttons.slice(0, G600_BUTTON_COUNT).map((entry, button) => ({
+      layer,
+      button,
+      action: g600DecodeButtonAction(entry),
+      raw: [entry.code, entry.modifier, entry.key],
+    }));
+  return [...layerOf("primary", profile.buttons), ...layerOf("g-shift", profile.gshiftButtons)];
 }

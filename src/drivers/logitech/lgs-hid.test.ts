@@ -138,6 +138,9 @@ test("readStatus decodes the captured G600 active profile", async () => {
   assert.equal(status.activeDpiStage, 0);
   assert.equal(status.pollingRateHz, 1000);
   assert.equal(status.lighting?.mode, "Cycling");
+  assert.equal(status.ui?.buttonLayerEditor?.keyboard, true);
+  assert.equal(status.buttonLayerAssignments?.[0]?.action, "Left click");
+  assert.equal(status.buttonLayerAssignments?.[5]?.action, "G-Shift");
 });
 
 test("setPollingRate rewrites the active profile and keeps unknown bytes", async () => {
@@ -189,4 +192,40 @@ test("setProfile writes the F0 switch then the default DPI slot", async () => {
   const active = reports.get(0xf0);
   assert.ok(active);
   assert.equal(active[1], 0x08, "profile 0 slot 0 with live-config bit set");
+});
+
+test("setButtonLayerAssignments patches one triple and keeps the rest", async () => {
+  const { device, reports } = fakeG600();
+  const client = new LogitechLgsHidClient(device);
+  await client.setButtonLayerAssignments([{ layer: "primary", button: 7, action: "Cycle DPI" }]);
+  const written = reports.get(0xf4);
+  assert.ok(written);
+  assert.equal(written[31], 0x01);
+  assert.equal(written[31 + 5 * 3], 0x17);
+  assert.equal(written[31 + 7 * 3], 0x13);
+});
+
+test("setButtonLayerAssignments refuses to remap primary click buttons", async () => {
+  const { device, sent } = fakeG600();
+  const client = new LogitechLgsHidClient(device);
+  await assert.rejects(
+    () => client.setButtonLayerAssignments([{ layer: "primary", button: 0, action: "Right click" }]),
+    /cannot be remapped/,
+  );
+  assert.equal(sent.some((entry) => entry.reportId === 0xf4), false);
+});
+
+test("setButtonLayerAssignments writes a keyboard triple", async () => {
+  const { device, reports } = fakeG600();
+  const client = new LogitechLgsHidClient(device);
+  await client.setButtonLayerAssignments([{
+    layer: "g-shift",
+    button: 8,
+    keyboard: { key: 0x04, modifiers: 0x02 },
+  }]);
+  const written = reports.get(0xf4);
+  assert.ok(written);
+  assert.equal(written[94 + 8 * 3], 0);
+  assert.equal(written[94 + 8 * 3 + 1], 0x02);
+  assert.equal(written[94 + 8 * 3 + 2], 0x04);
 });

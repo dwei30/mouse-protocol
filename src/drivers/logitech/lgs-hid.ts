@@ -9,21 +9,31 @@ import {
   G600_PROFILE_COUNT,
   G600_STAGE_COUNT,
   LGS_VENDOR_ID,
+  G600_BUTTON_ACTIONS,
+  G600_BUTTON_NAMES,
+  G600_LOCK_PRIMARY_COUNT,
   g600ActiveDpi,
   g600ActiveIsLive,
+  g600ButtonAssignments,
   g600DecodeActive,
   g600DecodeProfile,
   g600DpiOptions,
+  g600EncodeKeyboard,
+  g600EncodeNamedAction,
   g600EncodeProfile,
   g600EncodeSetDpiSlot,
   g600EncodeSetProfile,
   g600ProfileReportId,
+  g600WithButton,
   g600WithDpiStage,
   g600WithPollingRate,
   hasLgsCollection,
   lgsFeaturePayload,
   lgsProduct,
   lgsWebHidFeatureBytes,
+  type G600Button,
+  type G600ButtonLayer,
+  type G600NamedAction,
   type G600Profile,
   type G600Rgb,
   type LgsProduct,
@@ -89,6 +99,22 @@ function asBytes(view: DataView | ArrayBuffer): Uint8Array {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function wiredButton(edit: {
+  action?: string;
+  raw?: number[];
+  keyboard?: { key: number; modifiers: number };
+}): G600Button {
+  if (edit.keyboard) return g600EncodeKeyboard(edit.keyboard.key, edit.keyboard.modifiers);
+  if (edit.action && (G600_BUTTON_ACTIONS as readonly string[]).includes(edit.action)) {
+    return g600EncodeNamedAction(edit.action as G600NamedAction);
+  }
+  return {
+    code: edit.raw?.[0] ?? 0,
+    modifier: edit.raw?.[1] ?? 0,
+    key: edit.raw?.[2] ?? 0,
+  };
 }
 
 const LIVE_CONFIG_POLL_MS = 50;
@@ -206,6 +232,13 @@ export class LogitechLgsHidClient {
             maxDpi: G600_DPI_MAX,
             stepDpi: G600_DPI_STEP,
           },
+          buttonLayerEditor: {
+            layers: ["primary", "g-shift"],
+            names: [...G600_BUTTON_NAMES],
+            lockPrimaryCount: G600_LOCK_PRIMARY_COUNT,
+            actions: [...G600_BUTTON_ACTIONS],
+            keyboard: true,
+          },
         },
         batteryPercent: null,
         batteryState: "Unknown",
@@ -217,6 +250,7 @@ export class LogitechLgsHidClient {
         supportedPollingRates: [...G600_POLLING_RATES],
         activeProfile: active.profileIndex + 1,
         profileCount: G600_PROFILE_COUNT,
+        buttonLayerAssignments: g600ButtonAssignments(profile),
         connectionType: "Wired",
         liftOffDistance: null,
         supportedLiftOffDistances: [],
@@ -283,6 +317,33 @@ export class LogitechLgsHidClient {
         profile = g600WithDpiStage(profile, slot, stages[slot] ?? 0);
       }
       return (await this.writeG600Profile(profile)).dpiStages;
+    });
+  }
+
+  async setButtonLayerAssignments(
+    edits: Array<{
+      layer: G600ButtonLayer;
+      button: number;
+      action?: string;
+      raw?: number[];
+      keyboard?: { key: number; modifiers: number };
+    }>,
+  ): Promise<void> {
+    return this.run(async () => {
+      const active = g600DecodeActive(await this.getReport(G600_ACTIVE_REPORT_ID));
+      let profile = await this.readG600Profile(active.profileIndex);
+      for (const edit of edits) {
+        const next = wiredButton(edit);
+        if (edit.layer === "primary" && edit.button < G600_LOCK_PRIMARY_COUNT) {
+          const current = profile.buttons[edit.button];
+          if (!current || current.code !== next.code || current.modifier !== next.modifier || current.key !== next.key) {
+            throw new Error("Primary click buttons cannot be remapped to prevent losing control of the mouse.");
+          }
+          continue;
+        }
+        profile = g600WithButton(profile, edit.layer, edit.button, next);
+      }
+      await this.writeG600Profile(profile);
     });
   }
 
