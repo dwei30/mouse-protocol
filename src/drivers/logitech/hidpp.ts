@@ -68,6 +68,7 @@ import {
   isBoltReceiverProduct,
   isDirectConnectProduct,
   isDirectConnection,
+  isLgsProduct,
   OnboardOnlyError,
   withSoftwareId,
 } from "@openmouse/protocol/logitech";
@@ -605,6 +606,8 @@ export class LogitechHidppClient {
    */
   static isSupported(device: HIDDevice): boolean {
     if (device.vendorId !== LOGITECH_VENDOR_ID) return false;
+    // LGS mice share VID 0x046d but speak feature reports on 0xFF80, not HID++.
+    if (isLgsProduct(device.productId)) return false;
     return hasHidppShortCollection(device)
       || hasHidppLongCollection(device)
       || hasHidppBluetoothCollection(device);

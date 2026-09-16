@@ -24,6 +24,8 @@ import {
 import {
   HIDPP_BLUETOOTH_USAGE_PAGE,
   HIDPP_USAGE_PAGE,
+  LGS_USAGE,
+  LGS_USAGE_PAGE,
   LOGITECH_BOLT_PRODUCT_IDS,
   LOGITECH_DIRECT_PRODUCT_IDS,
 } from "@openmouse/protocol/logitech";
@@ -505,6 +507,10 @@ export const LOGITECH_BLUETOOTH_FILTERS: HIDDeviceFilter[] = [
   { vendorId: VENDOR_ID.logitech, usagePage: HIDPP_BLUETOOTH_USAGE_PAGE },
 ];
 
+export const LOGITECH_LGS_FILTERS: HIDDeviceFilter[] = [
+  { vendorId: VENDOR_ID.logitech, usagePage: LGS_USAGE_PAGE, usage: LGS_USAGE },
+];
+
 // Retained for existing imports; points at the first supported receiver.
 export const LOGITECH_RECEIVER_FILTER: HIDDeviceFilter = LOGITECH_RECEIVER_FILTERS[0];
 
@@ -705,6 +711,7 @@ export const SUPPORTED_HID_FILTERS: HIDDeviceFilter[] = [
     .map((productId) => ({ vendorId: NINJUTSO_VENDOR_ID, productId })),
   ...LOGITECH_RECEIVER_FILTERS,
   ...LOGITECH_BLUETOOTH_FILTERS,
+  ...LOGITECH_LGS_FILTERS,
   ...GEARHUB_HID_FILTERS,
   // Fantech mice use vendor usage page 0xFFFF, usage 0x02 for configuration.
   { vendorId: VENDOR_ID.fantech, usagePage: 0xffff, usage: 0x02 },

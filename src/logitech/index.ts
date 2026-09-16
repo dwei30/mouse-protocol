@@ -1,8 +1,13 @@
 export * from "./controls.js";
 export * from "./friendly-name.js";
+export * from "./g600.js";
 export * from "./haptics.js";
+export * from "./hidpp10.js";
 export * from "./hosts.js";
+export * from "./lgs.js";
 export * from "./wheel.js";
+
+import { hidpp10ErrorMessage } from "./hidpp10.js";
 
 // HID++ reserves software ID 0 for device-originated notifications. Using a
 // nonzero ID keeps command replies distinct from asynchronous mouse events.
@@ -140,34 +145,11 @@ const HIDPP20_ERRORS: Readonly<Record<number, string>> = {
   0x09: "unsupported",
 };
 
-/** HID++ 1.0 error codes, reported in byte 4 of a 0x8F error response. */
-const HIDPP10_ERRORS: Readonly<Record<number, string>> = {
-  0x01: "invalid command",
-  0x02: "invalid address",
-  0x03: "invalid value",
-  0x04: "connection request failed",
-  0x05: "too many devices",
-  0x06: "already exists",
-  0x07: "device busy",
-  0x08: "unknown device",
-  0x09: "resource error",
-  0x0a: "request unavailable",
-  0x0b: "unsupported parameter value",
-  0x0c: "wrong PIN code",
-};
-
 export function hidppErrorMessage(code: number): string {
   const reason = HIDPP20_ERRORS[code];
   return reason
     ? `The mouse rejected that setting (${reason}).`
     : `The mouse rejected that setting (HID++ 2.0 error 0x${code.toString(16).padStart(2, "0")}).`;
-}
-
-export function hidpp10ErrorMessage(code: number): string {
-  const reason = HIDPP10_ERRORS[code];
-  return reason
-    ? `The mouse rejected that setting (HID++ 1.0: ${reason}).`
-    : `The mouse rejected that setting (HID++ 1.0 error 0x${code.toString(16).padStart(2, "0")}).`;
 }
 
 /**
